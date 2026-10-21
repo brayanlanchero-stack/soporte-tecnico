@@ -1,0 +1,13 @@
+
+# Archivos locales y configuraciones privadas
+.env
+config.local.php
+
+# Copias de seguridad y archivos temporales
+*.sql
+*.log
+*.tmp
+
+# Archivos del sistema operativo
+Thumbs.db
+.DS_Store

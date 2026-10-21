@@ -5,6 +5,7 @@ config.local.php
 
 # Copias de seguridad y archivos temporales
 *.sql
+!soporte_tecnico_estructura.sql
 *.log
 *.tmp
 

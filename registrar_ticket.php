@@ -1,16 +1,28 @@
-
 <?php
+
+require_once "auth.php";
+
+exigirLogin();
+
 require_once "conexion.php";
 
 $mensaje = "";
 $tipo_mensaje = "";
 
-$solicitante = "";
+$solicitante = $_SESSION["nombre"] ?? "";
 $asunto = "";
 $descripcion = "";
 $categoria = "";
 $prioridad = "Media";
 
+$solicitante_id = (int) ($_SESSION["usuario_id"] ?? 0);
+// Diagnóstico temporal: comprobar la identidad de la sesión.
+error_log(
+    "Diagnóstico ticket: usuario_id=" .
+    ($_SESSION["usuario_id"] ?? "NO DEFINIDO") .
+    ", solicitante_id=" . $solicitante_id .
+    ", nombre=" . ($_SESSION["nombre"] ?? "NO DEFINIDO")
+);
 $categorias = [
     "Hardware",
     "Software",
@@ -28,15 +40,16 @@ $prioridades = [
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-    $solicitante = trim($_POST["solicitante"] ?? "");
+   
     $asunto = trim($_POST["asunto"] ?? "");
     $descripcion = trim($_POST["descripcion"] ?? "");
     $categoria = $_POST["categoria"] ?? "";
     $prioridad = $_POST["prioridad"] ?? "Media";
 
     if (
-        $solicitante === "" ||
-        $asunto === "" ||
+         $solicitante_id <= 0 ||
+         $solicitante === "" ||
+         $asunto === "" ||
         $descripcion === "" ||
         !in_array($categoria, $categorias, true) ||
         !in_array($prioridad, $prioridades, true)
@@ -50,51 +63,55 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     ) {
         $mensaje = "El solicitante admite hasta 100 caracteres y el asunto hasta 150.";
         $tipo_mensaje = "error";
+    
 
     } else {
-        $sql = "INSERT INTO tickets
-                (solicitante, asunto, descripcion, categoria, prioridad)
-                VALUES (?, ?, ?, ?, ?)";
+        
+$sql = "INSERT INTO tickets
+        (solicitante, solicitante_id, asunto, descripcion, categoria, prioridad)
+        VALUES (?, ?, ?, ?, ?, ?)";
 
-        $stmt = $conexion->prepare($sql);
+$stmt = $conexion->prepare($sql);
 
-        if ($stmt) {
-            $stmt->bind_param(
-                "sssss",
-                $solicitante,
-                $asunto,
-                $descripcion,
-                $categoria,
-                $prioridad
-            );
+if ($stmt) {
+   
+    $stmt->bind_param(
+        "sissss",
+        $solicitante,
+        $solicitante_id,
+        $asunto,
+        $descripcion,
+        $categoria,
+        $prioridad
+    );
 
-            if ($stmt->execute()) {
-                $id_ticket = $conexion->insert_id;
+    if ($stmt->execute()) {
+        $id_ticket = $conexion->insert_id;
 
-                $mensaje = "Ticket registrado correctamente. Número de ticket: "
-                         . $id_ticket;
-                $tipo_mensaje = "exito";
+        $mensaje = "Ticket registrado correctamente. Número de ticket: "
+                 . $id_ticket;
+        $tipo_mensaje = "exito";
 
-                $solicitante = "";
-                $asunto = "";
-                $descripcion = "";
-                $categoria = "";
-                $prioridad = "Media";
-            } else {
-                error_log("Error al registrar ticket: " . $stmt->error);
-                $mensaje = "No fue posible registrar el ticket. Intenta nuevamente.";
-                $tipo_mensaje = "error";
-            }
-
-            $stmt->close();
-        } else {
-            error_log("Error al preparar el registro: " . $conexion->error);
-            $mensaje = "No fue posible procesar la solicitud.";
-            $tipo_mensaje = "error";
-        }
+        $solicitante = $_SESSION["nombre"] ?? "";
+        $asunto = "";
+        $descripcion = "";
+        $categoria = "";
+        $prioridad = "Media";
+    } else {
+        error_log("Error al registrar ticket: " . $stmt->error);
+        $mensaje = "No fue posible registrar el ticket. Intenta nuevamente.";
+        $tipo_mensaje = "error";
     }
+
+    $stmt->close();
+} else {
+    error_log("Error al preparar el registro: " . $conexion->error);
+    $mensaje = "No fue posible procesar la solicitud.";
+    $tipo_mensaje = "error";
 }
 
+    }
+}
 function escapar($valor) {
     return htmlspecialchars(
         (string) $valor,
@@ -209,15 +226,10 @@ function escapar($valor) {
 
         <form action="registrar_ticket.php" method="POST">
 
-            <label for="solicitante">Nombre del solicitante *</label>
-            <input
-                type="text"
-                id="solicitante"
-                name="solicitante"
-                maxlength="100"
-                required
-                value="<?= escapar($solicitante) ?>"
-            >
+            <p>
+    <strong>Solicitante:</strong>
+    <?= escapar($_SESSION["nombre"] ?? "") ?>
+</p>
 
             <label for="asunto">Asunto *</label>
             <input

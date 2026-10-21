@@ -1,5 +1,10 @@
 
 <?php
+
+require_once "auth.php";
+
+exigirLogin();
+
 require_once "conexion.php";
 
 function escapar($valor) {
@@ -82,6 +87,11 @@ if (
     $error_fechas = "La fecha inicial no puede ser posterior a la fecha final.";
 }
 
+
+
+$rol = $_SESSION["rol"] ?? "";
+$usuario_id = (int) ($_SESSION["usuario_id"] ?? 0);
+
 $sql = "SELECT
             id,
             solicitante,
@@ -95,28 +105,65 @@ $sql = "SELECT
           AND (? = '' OR categoria = ?)
           AND (? = '' OR prioridad = ?)
           AND (? = '' OR fecha_creacion >= ?)
-          AND (? = '' OR fecha_creacion < DATE_ADD(?, INTERVAL 1 DAY))
-        ORDER BY id DESC";
+          AND (? = '' OR fecha_creacion < DATE_ADD(?, INTERVAL 1 DAY))";
+
+// El solicitante solo ve sus propios tickets.
+if ($rol === "Solicitante") {
+    $sql .= " AND solicitante_id = ?";
+}
+
+// El técnico solo ve los tickets que tiene asignados.
+if ($rol === "Tecnico") {
+    $sql .= " AND tecnico_id = ?";
+}
+
+$sql .= " ORDER BY id DESC";
 
 $stmt = $conexion->prepare($sql);
 
-$stmt->bind_param(
-    "ssssssssss",
-    $estado,
-    $estado,
-    $categoria,
-    $categoria,
-    $prioridad,
-    $prioridad,
-    $fecha_desde,
-    $fecha_desde,
-    $fecha_hasta,
-    $fecha_hasta
-);
+if ($stmt === false) {
+    error_log("Error al preparar consulta de tickets: " . $conexion->error);
+    exit("No fue posible consultar los tickets.");
+}
 
-$stmt->execute();
+if ($rol === "Solicitante" || $rol === "Tecnico") {
+    $stmt->bind_param(
+        "ssssssssssi",
+        $estado,
+        $estado,
+        $categoria,
+        $categoria,
+        $prioridad,
+        $prioridad,
+        $fecha_desde,
+        $fecha_desde,
+        $fecha_hasta,
+        $fecha_hasta,
+        $usuario_id
+    );
+} else {
+    $stmt->bind_param(
+        "ssssssssss",
+        $estado,
+        $estado,
+        $categoria,
+        $categoria,
+        $prioridad,
+        $prioridad,
+        $fecha_desde,
+        $fecha_desde,
+        $fecha_hasta,
+        $fecha_hasta
+    );
+}
+
+if (!$stmt->execute()) {
+    error_log("Error al consultar tickets: " . $stmt->error);
+    exit("No fue posible consultar los tickets.");
+}
 
 $resultado = $stmt->get_result();
+
 ?>
 
 <!DOCTYPE html>
@@ -320,7 +367,7 @@ $resultado = $stmt->get_result();
     <div class="tabla-contenedor">
         <table>
             <thead>
-                <tr>
+                            <tr>
                     <th>ID</th>
                     <th>Solicitante</th>
                     <th>Asunto</th>
@@ -328,6 +375,7 @@ $resultado = $stmt->get_result();
                     <th>Prioridad</th>
                     <th>Estado</th>
                     <th>Fecha de creación</th>
+                    <th>Acciones</th>
                 </tr>
             </thead>
 
@@ -343,6 +391,11 @@ $resultado = $stmt->get_result();
                             <td><?= escapar($ticket["prioridad"]) ?></td>
                             <td><?= escapar($ticket["estado"]) ?></td>
                             <td><?= escapar($ticket["fecha_creacion"]) ?></td>
+                            <td>
+    <a href="comentar_ticket.php?id=<?= (int) $ticket['id'] ?>">
+        Ver comentarios
+    </a>
+</td>
                         </tr>
                     <?php endwhile; ?>
 
